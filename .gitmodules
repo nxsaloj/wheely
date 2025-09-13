@@ -1,0 +1,6 @@
+[submodule "wheely.core"]
+	path = wheely.core
+	url = ./wheely.core
+[submodule "wheely.frontend"]
+	path = wheely.frontend
+	url = ./wheely.frontend
