@@ -1,0 +1,55 @@
+name: Update Changed Submodule
+
+on:
+  repository_dispatch:
+    types: [update-submodule]
+
+jobs:
+  update-submodule:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main repo with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "ci-bot"
+          git config user.email "ci-bot@users.noreply.github.com"
+
+      - name: Update submodules to latest tracked branches
+        run: |
+          git submodule sync --recursive
+          git submodule update --init --remote --recursive
+
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- ${{ github.event.client_payload.submodule }}; then
+            echo "No submodule changes."
+            exit 0
+          fi
+          BRANCH="ci/update-submodule-${{ github.event.client_payload.submodule }}"
+          git checkout -b "$BRANCH"
+          git add ${{ github.event.client_payload.submodule }} .gitmodules
+          git commit -m "chore(submodules): bump after submodule update (${{ github.event.client_payload.submodule }})"
+          git push --set-upstream origin "$BRANCH"
+
+      - name: Create Pull Request
+        id: cpr
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(submodules): update submodule ${{ github.event.client_payload.submodule }}"
+          branch: ci/update-submodule-${{ github.event.client_payload.submodule }}
+          title: "chore: update submodule ${{ github.event.client_payload.submodule }}"
+          body: "This PR updates the submodule reference to the latest HEAD."
+          auto-merge: true
+
+      - name: Auto-approve PR
+        uses: hmarr/auto-approve-action@v3
+        with:
+          github-token: ${{ secrets.PAT }}
+          pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
